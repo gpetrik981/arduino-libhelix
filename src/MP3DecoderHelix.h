@@ -137,24 +137,35 @@ class MP3DecoderHelix : public CommonHelix {
                 }
             } else {
                 // decoding error
-                LOG_HELIX(Debug, " -> decode error: %d - removing frame!", result);
                 int ignore = decoded;
-                if (ignore == 0) ignore = r.end;
-                // We advance to the next synch world
-                if (ignore<=buffer_size){
-                    buffer_size -= ignore;
-                    memmove(frame_buffer, frame_buffer+ignore, buffer_size);
-                }  else {
-                    buffer_size = 0;
-                }
 
+                if (result == ERR_MP3_INDATA_UNDERFLOW)
+                  ignore = 0;
+                else if (ignore == 0)
+                  ignore = r.end;
+
+                if (ignore) {
+                    LOG_HELIX(Warning, " -> dec err bs: %d [%d-%d] len: %d left: %d res: %d dec: %d", buffer_size, r.start, r.end, len, bytesLeft, result, decoded);
+
+                    // We advance to the next synch world
+                    if (ignore <= buffer_size) {
+                      buffer_size -= ignore;
+                      memmove(frame_buffer, frame_buffer+ignore, buffer_size);
+                    }  else {
+                      buffer_size = 0;
+                    }
+                }
             }
         }
 
         // return the resulting PCM data
         void provideResult(MP3FrameInfo &info){
             // increase PCM size if this fails
-            assert(info.outputSamps<maxPCMSize());
+            if (info.outputSamps>maxPCMSize())
+            {
+              LOG_HELIX(Error, "increase maxPCMSize > %d", info.outputSamps);
+              assert(0);
+            }
 
             LOG_HELIX(Debug, "=> provideResult: %d", info.outputSamps);
             if (info.outputSamps>0){
